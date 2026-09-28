@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gerador de Comando RFID - Avistar</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f3f5f7;
+      color: #1f2937;
+    }
+    .wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 760px;
+      background: #fff;
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 12px 35px rgba(0,0,0,.10);
+    }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    .sub { margin: 0 0 24px; color: #6b7280; }
+    label {
+      display: block;
+      font-weight: 700;
+      margin: 16px 0 8px;
+    }
+    input, textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 13px 14px;
+      font-size: 16px;
+      outline: none;
+    }
+    input:focus, textarea:focus {
+      border-color: #111827;
+      box-shadow: 0 0 0 3px rgba(17,24,39,.08);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 13px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .primary { background: #111827; color: white; }
+    .secondary { background: #e5e7eb; color: #111827; }
+    .success { background: #0f766e; color: white; }
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      font-family: Consolas, monospace;
+      background: #f9fafb;
+    }
+    .hint {
+      margin-top: 7px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .status {
+      margin-top: 12px;
+      min-height: 22px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .ok { color: #047857; }
+    .error { color: #b91c1c; }
+    @media (max-width: 640px) {
+      .row { grid-template-columns: 1fr; }
+      .card { padding: 20px; }
+      h1 { font-size: 23px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Gerador de Comando RFID</h1>
+      <p class="sub">Avistar Rastreadores • Modelo inicial RST-LC</p>
+
+      <div class="row">
+        <div>
+          <label for="trackerId">ID do rastreador</label>
+          <input id="trackerId" inputmode="numeric" placeholder="Ex.: 9570750" />
+          <div class="hint">O sistema acrescenta automaticamente os 2 zeros antes do ID.</div>
+        </div>
+
+        <div>
+          <label for="cardId">Número do cartão</label>
+          <input id="cardId" placeholder="Ex.: 01:86:02:35 ou 1860235" />
+          <div class="hint">Sempre será completado para 6 pares: XX:XX:XX:XX:XX:XX.</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="primary" onclick="gerarComando()">Gerar comando</button>
+        <button class="secondary" onclick="limparCampos()">Limpar</button>
+      </div>
+
+      <label for="output">Comando gerado</label>
+      <textarea id="output" readonly placeholder="O comando aparecerá aqui..."></textarea>
+
+      <div class="actions">
+        <button class="success" onclick="copiarComando()">Copiar comando</button>
+      </div>
+
+      <div id="status" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    function somenteHex(valor) {
+      return valor.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+    }
+
+    function formatarCartao(valor) {
+      let numero = somenteHex(valor);
+
+      if (!numero) {
+        throw new Error('Informe o número do cartão.');
+      }
+
+      if (numero.length > 12) {
+        throw new Error('O cartão possui mais de 12 caracteres (6 pares).');
+      }
+
+      numero = numero.padStart(12, '0');
+
+      return numero.match(/.{2}/g).join(':');
+    }
+
+    function formatarRastreador(valor) {
+      const id = valor.replace(/\D/g, '');
+
+      if (!id) {
+        throw new Error('Informe o ID do rastreador.');
+      }
+
+      return '00' + id;
+    }
+
+    function gerarComando() {
+      const trackerId = document.getElementById('trackerId').value.trim();
+      const cardId = document.getElementById('cardId').value.trim();
+      const output = document.getElementById('output');
+      const status = document.getElementById('status');
+
+      try {
+        const idFormatado = formatarRastreador(trackerId);
+        const cartaoFormatado = formatarCartao(cardId);
+
+        const comando =
+          `RST;A;RST-LC;V4.14;${idFormatado};1;186;2;${cartaoFormatado};3;FIM;`;
+
+        output.value = comando;
+        status.className = 'status ok';
+        status.textContent = 'Comando gerado com sucesso.';
+      } catch (erro) {
+        output.value = '';
+        status.className = 'status error';
+        status.textContent = erro.message;
+      }
+    }
+
+    async function copiarComando() {
+      const output = document.getElementById('output');
+      const status = document.getElementById('status');
+
+      if (!output.value) {
+        status.className = 'status error';
+        status.textContent = 'Gere um comando antes de copiar.';
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(output.value);
+        status.className = 'status ok';
+        status.textContent = 'Comando copiado.';
+      } catch {
+        output.select();
+        document.execCommand('copy');
+        status.className = 'status ok';
+        status.textContent = 'Comando copiado.';
+      }
+    }
+
+    function limparCampos() {
+      document.getElementById('trackerId').value = '';
+      document.getElementById('cardId').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('status').textContent = '';
+      document.getElementById('trackerId').focus();
+    }
+
+    document.getElementById('cardId').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') gerarComando();
+    });
+  </script>
+</body>
+</html>
